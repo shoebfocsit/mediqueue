@@ -1,0 +1,12 @@
+{
+  "name": "Remix: Remix: MediQueue",
+  "description": "Smart Queue Management \u0026 AI Medical Diagnosis System",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "AI Medical Analysis",
+    "Real-time Queue tracking",
+    "Health Assistant Chatbot"
+  ]
+}

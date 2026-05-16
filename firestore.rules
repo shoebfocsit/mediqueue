@@ -1,0 +1,133 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() { return request.auth != null; }
+    function isVerified() { return isSignedIn() && request.auth.token.email_verified == true; }
+    function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    
+    // Identity verification from trusted source
+    function isAdmin() { 
+      return isSignedIn() && get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == 'admin'; 
+    }
+
+    // --- Profiles ---
+    match /profiles/{userId} {
+      allow get: if isSignedIn() && (isOwner(userId) || isAdmin());
+      allow list: if isAdmin();
+      
+      allow create: if isOwner(userId) && isSignedIn();
+      
+      allow update: if (isOwner(userId) || isAdmin()) && (
+                        isAdmin() || (
+                          incoming().diff(existing()).affectedKeys().hasOnly(['full_name', 'phone', 'avatar_url', 'updated_at']) &&
+                          incoming().role == existing().role
+                        )
+                      );
+    }
+    
+    function isValidProfile(p) {
+      return p.full_name is string && p.full_name.size() > 0 && p.full_name.size() <= 100 &&
+             p.email is string && p.email.size() <= 100 &&
+             p.role in ['patient', 'doctor', 'admin'] &&
+             p.get('phone', '') is string && p.get('phone', '').size() <= 20 &&
+             p.get('avatar_url', '') is string && p.get('avatar_url', '').size() <= 1000;
+    }
+
+    // --- Queue ---
+    match /queue/{queueId} {
+      allow get: if isValidId(queueId) && isSignedIn();
+      allow list: if isSignedIn() && (
+        resource.data.patient_id == request.auth.uid || 
+        resource.data.doctor_id == request.auth.uid ||
+        isAdmin()
+      );
+      
+      allow create: if (isAdmin() || (isSignedIn() && isValidQueue(incoming()))) && 
+                      incoming().patient_id == request.auth.uid &&
+                      incoming().date == string(request.time.date().year()) + "-" + string(request.time.date().month()) + "-" + string(request.time.date().day()); 
+      
+      allow update: if isValidId(queueId) && (isAdmin() || (
+        isSignedIn() && 
+        resource.data.doctor_id == request.auth.uid &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'called_at', 'completed_at']) &&
+        isValidQueue(incoming())
+      ));
+    }
+
+    function isValidQueue(q) {
+      return q.patient_id is string && isValidId(q.patient_id) &&
+             q.doctor_id is string && isValidId(q.doctor_id) &&
+             q.queue_number is int &&
+             q.status in ['waiting', 'in_progress', 'done', 'skipped'] &&
+             q.date is string;
+    }
+
+    // --- Medical Reports ---
+    match /medical_reports/{reportId} {
+      allow get: if isValidId(reportId) && isSignedIn() && (
+        isOwner(existing().patient_id) || 
+        existing().doctor_id == request.auth.uid || 
+        isAdmin()
+      );
+      allow list: if isSignedIn() && (
+        resource.data.patient_id == request.auth.uid || 
+        resource.data.doctor_id == request.auth.uid ||
+        isAdmin()
+      );
+      
+      allow create: if isSignedIn() && isValidReport(incoming()) && (
+        isOwner(incoming().patient_id) || isAdmin()
+      ) && incoming().created_at == request.time;
+      
+      allow update: if isAdmin();
+    }
+
+    function isValidReport(r) {
+      return r.patient_id is string && isValidId(r.patient_id) &&
+             r.file_url is string && r.file_url.size() <= 1000 &&
+             r.processing_status in ['pending', 'processing', 'completed', 'failed'];
+    }
+
+    // --- Appointments ---
+    match /appointments/{appointmentId} {
+       allow read: if isValidId(appointmentId) && isSignedIn() && (
+         isOwner(resource.data.patient_id) || 
+         resource.data.doctor_id == request.auth.uid || 
+         isAdmin()
+       );
+       allow create: if isSignedIn() && (isOwner(incoming().patient_id) || isAdmin()) && 
+                       isValidAppointment(incoming()) &&
+                       incoming().created_at == request.time;
+       allow update: if isValidId(appointmentId) && (isAdmin() || (
+         isSignedIn() && 
+         (resource.data.patient_id == request.auth.uid || resource.data.doctor_id == request.auth.uid) &&
+         incoming().diff(existing()).affectedKeys().hasOnly(['status', 'notes', 'appointment_date', 'appointment_time'])
+       ));
+    }
+
+    function isValidAppointment(a) {
+      return a.patient_id is string && a.doctor_id is string &&
+             a.status in ['pending', 'confirmed', 'in_progress', 'completed', 'cancelled'] &&
+             a.appointment_date is string;
+    }
+
+    // --- Chat Sessions ---
+    match /chatbot_sessions/{sessionId} {
+      allow read, write: if isValidId(sessionId) && isSignedIn() && (
+        resource.data.patient_id == request.auth.uid || 
+        request.resource.data.patient_id == request.auth.uid || 
+        isAdmin()
+      );
+    }
+  }
+}

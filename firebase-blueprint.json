@@ -1,0 +1,148 @@
+{
+  "entities": {
+    "Profile": {
+      "title": "User Profile",
+      "description": "Base user profile for all roles",
+      "type": "object",
+      "properties": {
+        "full_name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["patient", "doctor", "admin"] },
+        "phone": { "type": "string" },
+        "avatar_url": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["full_name", "email", "role"]
+    },
+    "Doctor": {
+      "title": "Doctor Details",
+      "description": "Additional info for doctors",
+      "type": "object",
+      "properties": {
+        "profile_id": { "type": "string" },
+        "full_name": { "type": "string" },
+        "specialization": { "type": "string" },
+        "department": { "type": "string" },
+        "status": { "type": "string", "enum": ["Available", "In OT", "On Visit", "Away"] },
+        "consultation_fee": { "type": "number" },
+        "bio": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Patient": {
+      "title": "Patient Details",
+      "description": "Additional info for patients",
+      "type": "object",
+      "properties": {
+        "profile_id": { "type": "string" },
+        "date_of_birth": { "type": "string", "format": "date" },
+        "gender": { "type": "string" },
+        "blood_group": { "type": "string" },
+        "address": { "type": "string" },
+        "emergency_contact": { "type": "string" },
+        "assigned_doctor_id": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Appointment": {
+      "title": "Appointment",
+      "description": "Scheduled appointments",
+      "type": "object",
+      "properties": {
+        "patient_id": { "type": "string" },
+        "doctor_id": { "type": "string" },
+        "appointment_date": { "type": "string", "format": "date" },
+        "appointment_time": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "confirmed", "in_progress", "completed", "cancelled"] },
+        "notes": { "type": "string" },
+        "created_by": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "QueueEntry": {
+      "title": "Queue Entry",
+      "description": "Live queue management",
+      "type": "object",
+      "properties": {
+        "appointment_id": { "type": "string" },
+        "patient_id": { "type": "string" },
+        "patient_name": { "type": "string" },
+        "doctor_id": { "type": "string" },
+        "queue_number": { "type": "integer" },
+        "status": { "type": "string", "enum": ["waiting", "preparing", "in_progress", "done", "skipped"] },
+        "estimated_time": { "type": "string", "format": "date-time" },
+        "assigned_at": { "type": "string", "format": "date-time" },
+        "called_at": { "type": "string", "format": "date-time" },
+        "completed_at": { "type": "string", "format": "date-time" },
+        "date": { "type": "string", "format": "date" }
+      }
+    },
+    "MedicalReport": {
+      "title": "Medical Report",
+      "description": "Uploaded reports with AI analysis",
+      "type": "object",
+      "properties": {
+        "patient_id": { "type": "string" },
+        "uploaded_by": { "type": "string" },
+        "file_url": { "type": "string" },
+        "file_name": { "type": "string" },
+        "file_type": { "type": "string" },
+        "ai_diagnosis": { "type": "string" },
+        "ai_summary": { "type": "string" },
+        "ai_recommendations": { "type": "array", "items": { "type": "string" } },
+        "ai_risk_level": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+        "processing_status": { "type": "string", "enum": ["pending", "processing", "completed", "failed"] },
+        "created_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Prescription": {
+      "title": "Prescription",
+      "description": "Prescribed medicines",
+      "type": "object",
+      "properties": {
+        "patient_id": { "type": "string" },
+        "doctor_id": { "type": "string" },
+        "appointment_id": { "type": "string" },
+        "medicines": { "type": "array", "items": { "type": "object" } },
+        "instructions": { "type": "string" },
+        "follow_up_date": { "type": "string", "format": "date" },
+        "created_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "ChatSession": {
+      "title": "Chatbot Session",
+      "description": "AI chatbot history",
+      "type": "object",
+      "properties": {
+        "patient_id": { "type": "string" },
+        "messages": { "type": "array", "items": { "type": "object" } },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "User notifications",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string", "enum": ["queue_update", "appointment", "report_ready", "general"] },
+        "read": { "type": "boolean" },
+        "created_at": { "type": "string", "format": "date-time" }
+      }
+    }
+  },
+  "firestore": {
+    "/profiles/{userId}": { "schema": "Profile", "description": "Users of the system" },
+    "/doctors/{doctorId}": { "schema": "Doctor", "description": "Doctor-specific info" },
+    "/patients/{patientId}": { "schema": "Patient", "description": "Patient-specific info" },
+    "/appointments/{appointmentId}": { "schema": "Appointment", "description": "Appointments history" },
+    "/queue/{queueId}": { "schema": "QueueEntry", "description": "Current live queue" },
+    "/medical_reports/{reportId}": { "schema": "MedicalReport", "description": "Patient medical reports" },
+    "/prescriptions/{prescriptionId}": { "schema": "Prescription", "description": "Prescriptions given to patients" },
+    "/chatbot_sessions/{sessionId}": { "schema": "ChatSession", "description": "AI chat history" },
+    "/notifications/{notificationId}": { "schema": "Notification", "description": "System notifications" }
+  }
+}
